@@ -1,0 +1,124 @@
+services:
+#########################################
+#   Setup vue client container
+#########################################
+  client:
+    container_name: ${PROJECT_NAME}-client-${ENV_NAME}
+    restart: unless-stopped
+    build:
+      context: ./client
+      dockerfile: prod.DockerFile
+      args:
+        VITE_API_BASE_URL: ${API_BASE_URL}
+        VITE_CLIENT_DOCKER_PORT: ${VITE_CLIENT_DOCKER_PORT}
+#    ports:
+#      - "${NGINX_CLIENT_PORT}:5050"
+    environment:
+      - VITE_ENV=${NODE_ENV}
+      - VITE_API_BASE_URL=${API_BASE_URL}
+      - VITE_CLIENT_DOCKER_PORT=${VITE_CLIENT_DOCKER_PORT}
+    networks:
+      - web
+      - internal
+    volumes:
+      - ./client:/usr/src/app
+      - client_node_modules:/usr/src/app/node_modules
+    depends_on:
+      - api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.client.rule=Host(`${CLIENT_URL}`)"
+      - "traefik.http.services.client.loadbalancer.server.port=5050"
+      - "traefik.http.routers.client.entrypoints=websecure"
+      - "traefik.http.routers.client.tls.certresolver=${CERT_RESOLVER}"
+
+#########################################
+#   Setup express server container
+#########################################
+  api:
+    container_name: ${PROJECT_NAME}-app-${ENV_NAME}
+    restart: unless-stopped
+    build:
+      context: ./server
+      dockerfile: DockerFile
+      args:
+        NODE_ENV: ${NODE_ENV}
+        START_METHOD: ${START_METHOD}
+#    ports:
+#      - "${NODE_API_PORT}:${NODE_API_DOCKER_PORT}"
+    environment:
+      - SERVICE_NAME=app
+      - PROJECT_NAME=${PROJECT_NAME}
+      - NODE_ENV=${NODE_ENV}
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - COOKIE_SECRET=${COOKIE_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME}
+      - ACCESS_TOKEN_COOKIE_LIFETIME=${ACCESS_TOKEN_COOKIE_LIFETIME}
+      - REFRESH_TOKEN_LIFETIME=${REFRESH_TOKEN_LIFETIME}
+      - REFRESH_TOKEN_COOKIE_LIFETIME=${REFRESH_TOKEN_COOKIE_LIFETIME}
+      - START_METHOD=${START_METHOD}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - PUBLIC_KEY=${PUBLIC_KEY}
+      - CLIENT_ORIGIN=${CLIENT_URL}
+      - NODE_API_DOCKER_PORT=${NODE_API_DOCKER_PORT}
+    networks:
+      - internal
+      - web
+    depends_on:
+      db:
+        condition: service_healthy
+    #command: ["/usr/wait-for-database.sh", "db:3306", "--", "nodemon", "app.js"]
+    volumes:
+      - ./server:/usr/src/app
+      -  api_node_modules:/usr/src/app/node_modules
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.api.rule=Host(`${API_BASE_URL}`) && PathPrefix(`/api`)"
+      - "traefik.http.services.api.loadbalancer.server.port=${NODE_API_DOCKER_PORT}"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=${CERT_RESOLVER}"
+
+#########################################
+#   Setup MYSQL container
+#########################################
+  db:
+    container_name: ${DB_HOST}
+    image: mysql:8.0
+    restart: unless-stopped
+    ports:
+      - '${DB_PORT}:3306'
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - db-config:/etc/mysql
+      # - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+  web:
+    external: true
+
+volumes:
+  mysql_data:
+  db-config:
+  api_node_modules:
+  client_node_modules:

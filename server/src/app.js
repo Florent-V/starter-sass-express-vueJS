@@ -1,0 +1,86 @@
+import express from 'express';
+import dotenv from 'dotenv';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+
+import initDB from './database/init.js';
+import  { errorHandler, notFound, logError } from './middleware/errorMiddleware.js';
+import { init, send, setRouteFound, start, end } from './middleware/inOutMiddleware.js';
+import { adminRouter } from './admin/admin.js';
+
+import testRoutes from './routes/testRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import productRoutes from './routes/productRoutes.js';
+import toDoListRoutes from './routes/toDoListRoutes.js';
+import featureRoutes from "./routes/featureRoutes.js";
+import testimonialRoutes from "./routes/testimonialRoutes.js";
+import planRoutes from "./routes/planRoutes.js";
+import { authenticateByCookieSession } from "./middleware/authMiddleware.js";
+
+dotenv.config();
+const app = express();
+
+const port = process.env.NODE_API_DOCKER_PORT || 3000;
+
+const corsOptions = {
+  origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Origin", "Content-Type", "Accept"],
+  credentials: true // Autorise l'envoi de cookies et informations d'authentification
+};
+
+// Enable CORS
+app.use(cors(corsOptions));
+// parse requests of content-type - application/json
+app.use(express.json());
+// parse requests of content-type - application/x-www-form-urlencoded
+app.use(express.urlencoded({ extended: true }));
+// Dans ton middleware d'application
+app.use(cookieParser(process.env.COOKIE_SECRET));
+// serve the `backend/public` folder for public resources
+app.use('/api/uploads', express.static('public/uploads'));
+
+// Middlewares
+app.use(start);
+app.use(init);
+// Test Routes
+app.use('', testRoutes);
+app.use('/admin-panel', setRouteFound, authenticateByCookieSession, adminRouter);
+// Auth Routes
+app.use('/api/auth', setRouteFound, authRoutes);
+// User Routes
+app.use('/api/user', setRouteFound, userRoutes);
+// Tutorial Routes
+app.use('/api/product', setRouteFound, productRoutes);
+// ToDoList && ToDoItem Routes
+app.use('/api/todolist', setRouteFound, toDoListRoutes);
+// Features Routes
+app.use('/api/feature', setRouteFound, featureRoutes);
+// Features Routes
+app.use('/api/testimonial', setRouteFound, testimonialRoutes);
+// Plans Routes
+app.use('/api/plan', setRouteFound, planRoutes);
+// End Middleware
+app.use(end);
+// Send middleware
+app.use(send);
+
+
+// Error handling middleware
+app.use(logError);
+app.use(notFound);
+app.use(errorHandler);
+
+app.listen(port, async () => {
+  console.log(`Serveur démarré sur le port ${port}`);
+  try {
+    // Replace true by false when sync isn't needed
+    // Replace force by alter to keep data
+    // await initDB(false, 'alter');
+    await initDB(true, 'force');
+    console.log(`Server is running on port ${port}`);
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+  }
+});
