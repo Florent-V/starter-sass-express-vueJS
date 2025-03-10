@@ -15,17 +15,17 @@ const currentYear = ref(new Date().getFullYear());
           <h3 class="text-xl font-semibold mb-4">Quick Links</h3>
           <ul class="space-y-2">
             <li>
-              <RouterLink to="/" class="sign-in-button">
+              <RouterLink to="/">
                 Home
               </RouterLink>
             </li>
             <li>
-              <RouterLink to="/pricing" class="sign-in-button">
+              <RouterLink to="/pricing">
                 Pricing
               </RouterLink>
             </li>
             <li>
-              <RouterLink to="/about" class="sign-in-button">
+              <RouterLink to="/about">
                 About Us
               </RouterLink>
             </li>
